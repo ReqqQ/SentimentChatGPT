@@ -2,10 +2,17 @@ package ChatGPT
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/valyala/fasthttp"
 	"log"
+	"os"
 )
+
+const BASE_MODEL = "gpt-3.5-turbo"
+const REQUEST_TYPE_POST = "POST"
+
+type Init struct {
+	Client *fasthttp.Request
+}
 
 type Messages struct {
 	Role    string `json:"role"`
@@ -18,37 +25,24 @@ type RequestBody struct {
 	N           int        `json:"n"`
 }
 
-const CHATGTP_COMPLETIONS_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+func (gpt *Init) Init() Init {
+	gpt.Client = fasthttp.AcquireRequest()
+	gpt.Client.Header.Set("Authorization", "Bearer "+os.Getenv("CHAT_GPT_KEY"))
+	gpt.Client.Header.Set("Content-Type", "application/json")
 
-func Init() *fasthttp.Request {
-	req := fasthttp.AcquireRequest()
-	req.Header.Set("Authorization", "Bearer ")
-	req.Header.Set("Content-Type", "application/json")
-
-	return req
+	return *gpt
 }
-func GetSentiment(req *fasthttp.Request, message string) {
-	req.Header.SetMethod("POST")
-	req.SetRequestURI(CHATGTP_COMPLETIONS_ENDPOINT)
 
-	requestBody := RequestBody{
-		Model: "gpt-3.5-turbo",
-		Messages: []Messages{
-			{Role: "user", Content: "What is sentiment(positive,negative,neutral) of this message: '" + message + "'"},
-		},
-		Temperature: 1,
-		N:           1,
-	}
+func (gpt *Init) setRequestParams(requestBody RequestBody) []byte {
 	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
-
 	}
-	req.SetBody(jsonData)
+	gpt.Client.SetBody(jsonData)
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
-	if err := fasthttp.Do(req, resp); err != nil {
+	if err := fasthttp.Do(gpt.Client, resp); err != nil {
 		log.Fatalf("Error: %s", err)
 	}
 
-	fmt.Printf("Response body: %s\n", resp.Body())
+	return resp.Body()
 }
